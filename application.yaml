@@ -1,0 +1,5 @@
+Dbms: mysql
+MYSQL_IP: localhost
+MYSQL_UID: mcsdbg
+MYSQL_PWD: MyWceQc-cFgPynao
+LISTER_PORT: 80

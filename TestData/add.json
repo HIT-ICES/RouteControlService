@@ -1,0 +1,32 @@
+{
+  "id": "string",
+  "repo": "string",
+  "version": {
+    "major": "string",
+    "minor": "string",
+    "patch": "string"
+  },
+  "interfaces": [
+    {
+      "id": "string::11",
+      "path": "string",
+      "inputSize": 0,
+      "outputSize": "string"
+    }
+  ],
+  "idleResource": {
+    "cpu": 0,
+    "ram": 0,
+    "disk": 0,
+    "gpuCore": 0,
+    "gpuMem": 0
+  },
+  "desiredResource": {
+    "cpu": 0,
+    "ram": 0,
+    "disk": 0,
+    "gpuCore": 0,
+    "gpuMem": 0
+  },
+  "desiredCapability": 0
+}
