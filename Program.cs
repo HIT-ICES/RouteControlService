@@ -15,9 +15,13 @@ builder.Configuration.AddPlaceholderResolver()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddCors();
+if (builder.Environment.IsProduction())
+{
+    builder.Services.AddSingleton(KubernetesClientConfiguration.InClusterConfig());
+    builder.Services.AddSingleton<Kubernetes>();
+}
 
-builder.Services.AddSingleton(KubernetesClientConfiguration.InClusterConfig());
-builder.Services.AddSingleton<Kubernetes>();
+
 builder.Services.AddSingleton<IRouteController, FakeRouteController>();
 
 var app = builder.Build();
@@ -44,7 +48,7 @@ app.MapPost("/route-rules/add",
         var all = await routectl.GetAllAsync(rule.Namespace, rule.DesService);
         if (all is null)
         {
-            await routectl.CreateAllAsync(rule.Namespace, rule.DesService new[] { rule });
+            await routectl.CreateAllAsync(rule.Namespace, rule.DesService ,new[] { rule });
         }
         else
         {
@@ -57,7 +61,7 @@ app.MapPost("/route-rules/add",
 
         }
         return MResponse.Successful();
-    }).WithName("Get all route rules").WithOpenApi();
+    }).WithName("Create or Update route rule").WithOpenApi();
 
 app.MapPost("/route-rules/delete",
     async ([FromQuery] bool exact, [FromBody] RouteRuleId id) =>
@@ -72,6 +76,6 @@ app.MapPost("/route-rules/delete",
 
         }
         return MResponse.Successful();
-    }).WithName("Get all route rules").WithOpenApi();
+    }).WithName("Delete route rules").WithOpenApi();
 
 app.Run();
