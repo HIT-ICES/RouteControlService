@@ -60,7 +60,11 @@ make install
 ## 目录结构
 
 ```text
-├─📂IstioEntities ISTIO资源实体模型定义
+├─📂IstioEntities ISTIO资源实体模型定义，一般无需修改，请[参阅官方文档](https://istio.io/latest/zh/docs/reference/config/networking/virtual-service/)
+├─📂RouteControlling Bean和Service
+│	├─🗒️IRouteController.cs 包含路由控制Service接口和一个假实现
+│	├─🗒️RouteController.cs 包含路由控制Service的真实现
+│	└─🗒️RouteRule.cs Bean
 ├─📂Properties
 │   └─🗒️launchSettings.json 启动配置│
 ├─📂TestData 接口测试数据json

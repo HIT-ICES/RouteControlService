@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.JsonPatch;
 using RouteControlService.IstioEntities;
 using System.Xml.Linq;
 
-namespace RouteControlService;
+namespace RouteControlService.RoutControlling;
 
 public record struct K8SResourceAddress(string Namespace, string Name);
 

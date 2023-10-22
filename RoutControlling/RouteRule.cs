@@ -1,4 +1,4 @@
-﻿namespace RouteControlService;
+﻿namespace RouteControlService.RoutControlling;
 
 [Serializable]
 public record K8sResourceId(string Namespace, string Name);
