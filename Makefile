@@ -15,6 +15,8 @@ K8S_REPLICA = 1
 default:
 	$(DOCKER) build -f $(DOCKERFILE_DIR)/Dockerfile -t $(IMAGE_NAME):$(IMAGE_TAG) $(WORK_DIR)
 
+
+
 restart:
 	$(K8S) delete pod -f -l 'app=$(APP_NAME)'
 
@@ -28,7 +30,7 @@ logs:
 	$(K8S) logs -f -l 'app=$(APP_NAME)'
 
 uninstall:
-	$(K8S) delete -f deploy.yaml
+	IMG_TAG=$(IMAGE_TAG) SVC_NAME=$(IMAGE_NAME) IMG_REPO=$(REPO_NAME) | $(K8S) delete -f -
 
 tag: default
 	$(DOCKER) tag $(IMAGE_NAME):$(IMAGE_TAG) $(REPO_NAME)/$(IMAGE_NAME):$(IMAGE_TAG)
@@ -36,8 +38,8 @@ tag: default
 publish: tag
 	$(DOCKER) push $(REPO_NAME)/$(IMAGE_NAME):$(IMAGE_TAG)
 
-install: publish
-	IMG_TAG = $(IMAGE_TAG) envsubst < deploy.yaml | $(K8S) apply -f -
+install:
+	IMG_TAG=$(IMAGE_TAG) SVC_NAME=$(IMAGE_NAME) IMG_REPO=$(REPO_NAME) envsubst < deploy.yaml | $(K8S) apply -f -
 
 status:
 	watch $(K8S) get pods -l 'app=$(APP_NAME)'
