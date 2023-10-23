@@ -1,85 +1,38 @@
-# mysql-secret.yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: route-control-service-mysql-secret
-type: kubernetes.io/basic-auth
-stringData:
-  password: W0Kg49+fyQZ!liVo # change this to a secure password
----
-# mysql-deployment.yaml
 apiVersion: v1
 kind: Service
 metadata:
-  name: route-control-service-mysql
-spec:
-  ports:
-    - port: 3306 # change this to the desired port if needed
-  selector:
-    app: route-control-service-mysql
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: route-control-service-mysql # change this to the desired name if needed
-spec:
-  selector:
-    matchLabels:
-      app: route-control-service-mysql # change this to the desired label if needed
-  template:
-    metadata:
-      labels:
-        app: route-control-service-mysql # change this to the desired label if needed
-    spec:
-      containers:
-        - image: mysql:5.6 # change this to the desired image if needed
-          name: route-control-service-mysql # change this to the desired name if needed
-          env:
-            # Use secret in real usage, see https://kubernetes.io/docs/concepts/configuration/secret/\
-            - name: MYSQL_ROOT_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: route-control-service-mysql-secret # reference the secret created above, change this to the desired name if needed 
-                  key: password # reference the key in the secret, change this to the desired key if needed 
-          ports:
-            - containerPort: 3306 # change this to the desired port if needed 
-              name: mysql # change this to the desired name if needed 
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: route-control-service
+  name: $SVC_NAME
 spec:
   ports:
     - port: 80 # change this to the desired port if needed
   selector:
-    app: route-control-service
+    app: $SVC_NAME
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: route-control-service # change this to the desired name if needed
+  name: $SVC_NAME # change this to the desired name if needed
 spec:
   selector:
     matchLabels:
-      app: route-control-service # change this to the desired label if needed
+      app: $SVC_NAME # change this to the desired label if needed
   template:
     metadata:
       labels:
-        app: route-control-service # change this to the desired label if needed
+        app: $SVC_NAME # change this to the desired label if needed
     spec:
       containers:
-        - image: 192.168.1.104:5000/cloud-collaboration-platform/route-control-service:$IMG_TAG # change this to the desired image if needed
-          name: route-control-service # change this to the desired name if needed
+        - image: $IMG_REPO/$SVC_NAME:$IMG_TAG # change this to the desired image if needed
+          name: $SVC_NAME # change this to the desired name if needed
           env:
             - name: MYSQL_UID
               value: root
             - name: MYSQL_IP
-              value: route-control-service-mysql
+              value: $SVC_NAME-mysql
             - name: MYSQL_PWD
               valueFrom:
                 secretKeyRef:
-                  name: route-control-service-mysql-secret # reference the secret created above, change this to the desired name if needed 
+                  name: $SVC_NAME-mysql-secret # reference the secret created above, change this to the desired name if needed 
                   key: password # reference the key in the secret, change this to the desired key if needed 
           ports:
             - containerPort: 80 # change this to the desired port if needed 
