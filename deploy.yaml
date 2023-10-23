@@ -24,16 +24,6 @@ spec:
       containers:
         - image: $IMG_REPO/$SVC_NAME:$IMG_TAG # change this to the desired image if needed
           name: $SVC_NAME # change this to the desired name if needed
-          env:
-            - name: MYSQL_UID
-              value: root
-            - name: MYSQL_IP
-              value: $SVC_NAME-mysql
-            - name: MYSQL_PWD
-              valueFrom:
-                secretKeyRef:
-                  name: $SVC_NAME-mysql-secret # reference the secret created above, change this to the desired name if needed 
-                  key: password # reference the key in the secret, change this to the desired key if needed 
           ports:
             - containerPort: 80 # change this to the desired port if needed 
               name: http # change this to the desired name if needed 
