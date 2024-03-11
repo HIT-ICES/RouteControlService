@@ -10,14 +10,15 @@ public interface IRouteController
 public class FakeRouteController : IRouteController
 {
     private readonly Dictionary<(string, string), RouteRule[]> _memoryStorage = new();
+
     public Task<RouteRule[]?> GetAllAsync(string @namespace, string serviceName)
     {
-        return Task.FromResult(_memoryStorage.TryGetValue((@namespace, serviceName), out var v) ? v : null);
+        return Task.FromResult(_memoryStorage.GetValueOrDefault((@namespace, serviceName)));
     }
 
     public Task UpdateAllAsync(string @namespace, string serviceName, RouteRule[] newRules)
     {
-        _memoryStorage[(@namespace, serviceName)]= newRules;
+        _memoryStorage[(@namespace, serviceName)] = newRules;
         return Task.CompletedTask;
     }
 

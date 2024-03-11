@@ -1,32 +1,29 @@
 {
-  "id": "string",
-  "repo": "string",
-  "version": {
-    "major": "string",
-    "minor": "string",
-    "patch": "string"
-  },
-  "interfaces": [
+  "namespace": "liuhongzhi",
+  "desService": "example-service",
+  "name": "route-ctl-test",
+  "srcPods": [
     {
-      "id": "string::11",
-      "path": "string",
-      "inputSize": 0,
-      "outputSize": "string"
+      "namespace": "liuhongzhi",
+      "name": "example-caller-service-pod-1"
     }
   ],
-  "idleResource": {
-    "cpu": 0,
-    "ram": 0,
-    "disk": 0,
-    "gpuCore": 0,
-    "gpuMem": 0
-  },
-  "desiredResource": {
-    "cpu": 0,
-    "ram": 0,
-    "disk": 0,
-    "gpuCore": 0,
-    "gpuMem": 0
-  },
-  "desiredCapability": 0
+  "desPods": [
+    {
+      "namespace": "liuhongzhi",
+      "name": "example-service-pod-1"
+    }
+  ],
+  "endpointControls": [
+    {
+      "uri": "/",
+      "useRegex": false
+    }
+  ],
+  "extraInfo": {
+    "portNumber": 90,
+    "hosts": [
+      "*"
+    ]
+  }
 }

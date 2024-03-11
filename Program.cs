@@ -33,49 +33,80 @@ app.UseSwaggerUI();
 
 var routectl = app.Services.GetRequiredService<IRouteController>();
 
-app.MapPost("/route-rules/all",
-    async ([FromQuery] bool exact, [FromBody] RouteRuleId id) =>
-{
-    var all = await routectl.GetAllAsync(id.Namespace, id.DesService);
-    return all != null ?
-    Ok(all.Where(r => exact ? r.Name == id.Name : r.Name.Contains(id.Name ?? "")).ToArray()) :
-    Ok(Array.Empty<RouteRule>());
-}).WithName("Get all route rules").WithOpenApi();
-
-app.MapPost("/route-rules/add",
-    async ([FromQuery] bool allowOverwrite, [FromBody] RouteRule rule) =>
-    {
-        var all = await routectl.GetAllAsync(rule.Namespace, rule.DesService);
-        if (all is null)
+app.MapPost
+    (
+        "/route-rules/all",
+        async ([FromQuery] bool exact, [FromBody] RouteRuleId id) =>
         {
-            await routectl.CreateAllAsync(rule.Namespace, rule.DesService ,new[] { rule });
+            var all = await routectl.GetAllAsync(id.Namespace, id.DesService);
+            return all != null
+                       ? Ok
+                       (
+                           all.Where
+                               (
+                                   r => exact
+                                            ? r.Name == id.Name
+                                            : string.IsNullOrWhiteSpace(id.Name) || r.Name.Contains(id.Name ?? "")
+                               )
+                              .ToArray()
+                       )
+                       : Ok(Array.Empty<RouteRule>());
         }
-        else
+    )
+   .WithName("Get all route rules")
+   .WithOpenApi();
+
+app.MapPost
+    (
+        "/route-rules/add",
+        async ([FromQuery] bool allowOverwrite, [FromBody] RouteRule rule) =>
         {
-            if (all.Any(r => r.Name == rule.Name) && !allowOverwrite)
+            var all = await routectl.GetAllAsync(rule.Namespace, rule.DesService);
+            if (all is null)
             {
-                return MResponse.Failed("Failed To add route rule: Already Existing!");
+                await routectl.CreateAllAsync(rule.Namespace, rule.DesService, new[] { rule });
             }
-            await routectl.UpdateAllAsync(rule.Namespace, rule.DesService,
-                all.Where(r => r.Name != rule.Name).Append(rule).ToArray());
+            else
+            {
+                if (all.Any(r => r.Name == rule.Name) && !allowOverwrite)
+                {
+                    return MResponse.Failed("Failed To add route rule: Already Existing!");
+                }
 
+                await routectl.UpdateAllAsync
+                (
+                    rule.Namespace,
+                    rule.DesService,
+                    all.Where(r => r.Name != rule.Name).Append(rule).ToArray()
+                );
+            }
+
+            return MResponse.Successful();
         }
-        return MResponse.Successful();
-    }).WithName("Create or Update route rule").WithOpenApi();
+    )
+   .WithName("Create or Update route rule")
+   .WithOpenApi();
 
-app.MapPost("/route-rules/delete",
-    async ([FromQuery] bool exact, [FromBody] RouteRuleId id) =>
-    {
-        var all = await routectl.GetAllAsync(id.Namespace, id.DesService);
-        if (all is not null)
+app.MapPost
+    (
+        "/route-rules/delete",
+        async ([FromQuery] bool exact, [FromBody] RouteRuleId id) =>
         {
+            var all = await routectl.GetAllAsync(id.Namespace, id.DesService);
+            if (all is not null)
+            {
+                await routectl.UpdateAllAsync
+                (
+                    id.Namespace,
+                    id.DesService,
+                    all.Where(r => exact ? r.Name != id.Name : !r.Name.Contains(r.Name)).ToArray()
+                );
+            }
 
-            await routectl.UpdateAllAsync(id.Namespace, id.DesService,
-                all.Where(r => exact? 
-                r.Name != id.Name:!r.Name.Contains(r.Name)).ToArray());
-
+            return MResponse.Successful();
         }
-        return MResponse.Successful();
-    }).WithName("Delete route rules").WithOpenApi();
+    )
+   .WithName("Delete route rules")
+   .WithOpenApi();
 
 app.Run();
