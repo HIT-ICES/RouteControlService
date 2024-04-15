@@ -5,7 +5,6 @@ using RouteControlService.IstioEntities;
 
 namespace RouteControlService.RoutControlling;
 
-
 public record struct K8SResourceLabel(string Key, string Value);
 
 public record struct HostAddress(string Hostname, uint Port);
@@ -262,20 +261,20 @@ public class RouteController(Kubernetes K8S, ILogger<RouteController> logger) : 
     {
         // Step 1: Create DesRule
         var destRule = new DestinationRule
-        {
-            Metadata =
+                       {
+                           Metadata =
                            {
                                Name = serviceName
                            }
-        };
+                       };
         destRule.Spec.Subsets =
             newRules.Select
                      (
                          r => new Subset
-                         {
-                             Name = r.Name,
-                             Labels = new() { { r.AsLabel(true).Key, r.Name } }
-                         }
+                              {
+                                  Name = r.Name,
+                                  Labels = new() { { r.AsLabel(true).Key, r.Name } }
+                              }
                      )
                     .ToList();
         await K8S.CreateNamespacedCustomObjectAsync
@@ -285,44 +284,59 @@ public class RouteController(Kubernetes K8S, ILogger<RouteController> logger) : 
         vService.Spec.Hosts = [serviceName];
         vService.Metadata.Name = serviceName;
         vService.Spec.Http =
-            newRules.Select(
-                r => new HttpRoute
-                {
-                    Name = r.Name,
-                    Match = r.EndpointControls.Length != 0 ?
-                        [.. r.EndpointControls.Select(
-                            ep=>new HTTPMatchRequest()
-                            {
-                                Name=r.Name,
-                                SourceLabels= new() { { r.AsLabel(false).Key, r.Name } },
-                                Uri=new(){
-                                    Value=ep.Uri,
-                                    Type=ep.UseRegex switch
-                                    {
-                                        true => StringMatchType.Regex,
-                                        false => StringMatchType.Exact,
-                                        null => StringMatchType.Prefix
-                                    }
-                                }
-                            })
-
-                        ] :
-                        [
-                            new HTTPMatchRequest
-                            {
-                                Name=r.Name,
-                                SourceLabels= new() { { r.AsLabel(false).Key, r.Name } },
-
-                            }
-                        ]
-                }).ToList();
+            newRules.Select
+                     (
+                         r => new HttpRoute
+                              {
+                                  Name = r.Name,
+                                  Match = r.EndpointControls.Length != 0
+                                              ?
+                                              [
+                                                  .. r.EndpointControls.Select
+                                                  (
+                                                      ep => new HTTPMatchRequest()
+                                                            {
+                                                                Name = r.Name,
+                                                                SourceLabels =
+                                                                    new() { { r.AsLabel(false).Key, r.Name } },
+                                                                Uri = new()
+                                                                      {
+                                                                          Value = ep.Uri,
+                                                                          Type = ep.UseRegex switch
+                                                                              {
+                                                                                  true => StringMatchType.Regex,
+                                                                                  false => StringMatchType.Exact,
+                                                                                  null => StringMatchType.Prefix
+                                                                              }
+                                                                      }
+                                                            }
+                                                  )
+                                              ]
+                                              :
+                                              [
+                                                  new HTTPMatchRequest
+                                                  {
+                                                      Name = r.Name,
+                                                      SourceLabels = new() { { r.AsLabel(false).Key, r.Name } },
+                                                  }
+                                              ]
+                              }
+                     )
+                    .ToList();
         await K8S.CreateNamespacedCustomObjectAsync
             (vService, VirtualService.GROUP, VirtualService.VERSION, @namespace, serviceName, VirtualService.PLURAL);
         // Step 3: Tag pods
 
-        await Task.WhenAll(newRules.SelectMany(
-            r => r.SrcPods.Select(p => TagInstance(p, r.AsLabel(false))).Concat(
-                r.DesPods.Select(p => TagInstance(p, r.AsLabel(true))))));
-
+        await Task.WhenAll
+        (
+            newRules.SelectMany
+            (
+                r => r.SrcPods.Select(p => TagInstance(p, r.AsLabel(false)))
+                      .Concat
+                       (
+                           r.DesPods.Select(p => TagInstance(p, r.AsLabel(true)))
+                       )
+            )
+        );
     }
 }
