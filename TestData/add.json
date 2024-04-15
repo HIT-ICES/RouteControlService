@@ -1,17 +1,17 @@
 {
-  "namespace": "liuhongzhi",
-  "desService": "example-service",
+  "namespace": "rescue-system",
+  "desService": "basiclocalenvsenso",
   "name": "route-ctl-test",
   "srcPods": [
     {
-      "namespace": "liuhongzhi",
-      "name": "example-caller-service-pod-1"
+      "namespace": "rescue-system",
+      "name": "basicenvironmentst-pod-1"
     }
   ],
   "desPods": [
     {
-      "namespace": "liuhongzhi",
-      "name": "example-service-pod-1"
+      "namespace": "rescue-system",
+      "name": "basiclocalenvsenso-pod-1"
     }
   ],
   "endpointControls": [
