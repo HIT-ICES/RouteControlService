@@ -4,9 +4,10 @@ namespace RouteControlService.IstioEntities;
 /// <summary>
 /// DestinationRule defines policies that apply to traffic intended for a service after routing has occurred.
 /// </summary>
-public class DestinationRule : CustomResource<DestinationRuleSpec>
+[Serializable]
+public class DestinationRule() : CustomResource<DestinationRuleSpec>("DestinationRule", $"{GROUP}/{VERSION}",new())
 {
-    public static readonly string PLURAL = "DestinationRules";
+    public static readonly string PLURAL = "destinationrules";
     public static readonly string GROUP = "networking.istio.io";
     public static readonly string VERSION = "v1alpha3";
 }
@@ -28,7 +29,8 @@ public class DestinationRuleSpec
     ///
     /// Note that the host field applies to both HTTP and TCP services.
     /// </summary>
-    [JsonPropertyName("host")] public string Host { get; set; }
+    [JsonPropertyName("host")]
+    public string Host { get; set; } = "*";
     /// <summary>
     /// One or more named sets that represent individual versions of a service.Traffic policies can be overridden at subset level.
     /// </summary>

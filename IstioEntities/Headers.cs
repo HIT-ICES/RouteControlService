@@ -16,7 +16,7 @@ public class Headers
     [JsonPropertyName("request")] public HeaderOperations? Request { get; set; }
 
     [JsonPropertyName("response")] public HeaderOperations? Response { get; set; }
-
+    [Serializable]
     public class HeaderOperations
     {
         [JsonPropertyName("add")] public Dictionary<string, string>? Add { get; set; }

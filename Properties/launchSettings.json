@@ -9,7 +9,7 @@
         "MYSQL_IP": "127.0.0.1"
       },
       "dotnetRunMessages": true,
-      "applicationUrl": "http://localhost:5282"
+      "applicationUrl": "http://localhost:8088"
     },
     "IIS Express": {
       "commandName": "IISExpress",

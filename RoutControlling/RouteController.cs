@@ -1,4 +1,5 @@
 ﻿using k8s;
+using k8s.Autorest;
 using k8s.Models;
 using Microsoft.AspNetCore.JsonPatch;
 using RouteControlService.IstioEntities;
@@ -133,15 +134,23 @@ public class RouteController(Kubernetes K8S, ILogger<RouteController> logger) : 
     /// <param name="label"></param>
     private async Task TagInstance(K8sResourceId podRef, K8SResourceLabel label)
     {
-        await K8S.PatchNamespacedPodAsync(RouteCtl.AddLabelPatch(label), podRef.Name, podRef.Namespace);
+        try
+        {
+            await K8S.PatchNamespacedPodAsync(RouteCtl.AddLabelPatch(label), podRef.Name, podRef.Namespace);
+        }
+        catch (HttpOperationException ex)
+        {
+            Console.WriteLine(ex);
+            throw;
+        }
     }
 
     /// <inheritdoc />
     public async Task<RouteRule[]?> GetAllAsync(string @namespace, string serviceName)
     {
         var pods = await K8S.ListPodForAllNamespacesAsync();
-        var srcLabel = $"route-ctl/out/{@namespace}/{serviceName}";
-        var desLabel = $"route-ctl/in/{@namespace}/{serviceName}";
+        var srcLabel = $"route-ctl/out--{@namespace}--{serviceName}";
+        var desLabel = $"route-ctl/in--{@namespace}--{serviceName}";
         var rules = new Dictionary<string, (List<K8sResourceId>, List<K8sResourceId>, List<EndpointControl>)>();
 
         foreach (var pod in pods)
@@ -172,48 +181,57 @@ public class RouteController(Kubernetes K8S, ILogger<RouteController> logger) : 
             }
         }
 
-        if (await K8S.GetNamespacedCustomObjectAsync
-            (
-                VirtualService.GROUP,
-                VirtualService.VERSION,
-                @namespace,
-                VirtualService.PLURAL,
-                serviceName
-            ) is not VirtualService vservice
-         || vservice.Spec.Http is null)
+        try
         {
-            logger.LogWarning
-            (
-                "Failed to get Virtual Service Http routes for {ns}.{sn}, assuming not exist.",
-                @namespace,
-                serviceName
-            );
-            return [];
-        }
-
-        foreach (var route in vservice.Spec.Http)
-        {
-            if (route.Match is not { } httpMatch
-             || rules.TryGetValue(route.Name ?? "", out var rule)) continue;
-            foreach (var match in httpMatch)
-            {
-                if (match.Uri is not { } uriMatch) continue;
-                rule.Item3.Add
+            if (await K8S.GetNamespacedCustomObjectAsync
                 (
-                    new
-                    (
-                        uriMatch.Value,
-                        uriMatch.Type switch
-                        {
-                            StringMatchType.Exact => false,
-                            StringMatchType.Prefix => null,
-                            StringMatchType.Regex => true,
-                            _ => throw new ArgumentOutOfRangeException()
-                        }
-                    )
+                    VirtualService.GROUP,
+                    VirtualService.VERSION,
+                    @namespace,
+                    VirtualService.PLURAL,
+                    serviceName
+                ) is not VirtualService vservice
+             || vservice.Spec.Http is null)
+            {
+                logger.LogWarning
+                (
+                    "Failed to get Virtual Service Http routes for {ns}.{sn}, assuming not exist.",
+                    @namespace,
+                    serviceName
                 );
+                return [];
+            }
+
+            foreach (var route in vservice.Spec.Http)
+            {
+                if (route.Match is not { } httpMatch
+                 || rules.TryGetValue(route.Name ?? "", out var rule)) continue;
+                foreach (var match in httpMatch)
+                {
+                    if (match.Uri is not { } uriMatch) continue;
+                    rule.Item3.Add
+                    (
+                        new
+                        (
+                            uriMatch.Value,
+                            uriMatch.Type switch
+                            {
+                                StringMatchType.Exact => false,
+                                StringMatchType.Prefix => null,
+                                StringMatchType.Regex => true,
+                                _ => throw new ArgumentOutOfRangeException()
+                            }
+                        )
+                    );
+                }
             }
         }
+        catch (HttpOperationException httpExp)
+        {
+            logger.LogWarning("Caught HTTP operation exception, assuming no rule exists: {ex}", httpExp);
+            return null;
+        }
+
 
         return rules.Select
                      (
@@ -225,28 +243,10 @@ public class RouteController(Kubernetes K8S, ILogger<RouteController> logger) : 
                              kv.Value.Item1.ToArray(),
                              kv.Value.Item2.ToArray(),
                              kv.Value.Item3.ToArray(),
-                             null
+                             RouteRuleExtraInfo.Default
                          )
                      )
                     .ToArray();
-
-        if (await K8S.GetNamespacedCustomObjectAsync
-            (
-                DestinationRule.GROUP,
-                DestinationRule.VERSION,
-                @namespace,
-                DestinationRule.PLURAL,
-                serviceName
-            ) is not DestinationRule destRules)
-        {
-            logger.LogWarning
-            (
-                "Failed to get DestinationRule for {ns}.{sn}, assuming not exist.",
-                @namespace,
-                serviceName
-            );
-            return [];
-        }
     }
 
     /// <inheritdoc />
@@ -277,8 +277,23 @@ public class RouteController(Kubernetes K8S, ILogger<RouteController> logger) : 
                               }
                      )
                     .ToList();
-        await K8S.CreateNamespacedCustomObjectAsync
-            (destRule, DestinationRule.GROUP, DestinationRule.VERSION, @namespace, serviceName, DestinationRule.PLURAL);
+        try
+        {
+            await K8S.CreateNamespacedCustomObjectAsync
+            (
+                destRule,
+                DestinationRule.GROUP,
+                DestinationRule.VERSION,
+                @namespace,
+                DestinationRule.PLURAL
+            );
+        }
+        catch (HttpOperationException ex)
+        {
+            Console.WriteLine(ex);
+            throw;
+        }
+
         // Step 2: Create VService
         var vService = new VirtualService();
         vService.Spec.Hosts = [serviceName];
@@ -289,6 +304,41 @@ public class RouteController(Kubernetes K8S, ILogger<RouteController> logger) : 
                          r => new HttpRoute
                               {
                                   Name = r.Name,
+                                  Route = r.ExtraInfo?.Hosts is not null or []
+                                              ? r.ExtraInfo.Hosts.Select
+                                                  (
+                                                      h =>
+                                                          new HttpRouteDestination()
+                                                          {
+                                                              Destination = new Destination()
+                                                                            {
+                                                                                Host = h,
+                                                                                Port = new PortSelector()
+                                                                                    {
+                                                                                        Number = r.ExtraInfo?.PortNumber
+                                                                                         ?? 80
+                                                                                    },
+                                                                                Subset = r.Name
+                                                                            }
+                                                          }
+                                                  )
+                                                 .ToList()
+                                              :
+                                              [
+                                                  new HttpRouteDestination()
+                                                  {
+                                                      Destination = new Destination()
+                                                                    {
+                                                                        Host = serviceName,
+                                                                        Port = new PortSelector()
+                                                                               {
+                                                                                   Number = r.ExtraInfo?.PortNumber
+                                                                                    ?? 80
+                                                                               },
+                                                                        Subset = r.Name
+                                                                    }
+                                                  }
+                                              ],
                                   Match = r.EndpointControls.Length != 0
                                               ?
                                               [
@@ -323,8 +373,17 @@ public class RouteController(Kubernetes K8S, ILogger<RouteController> logger) : 
                               }
                      )
                     .ToList();
-        await K8S.CreateNamespacedCustomObjectAsync
-            (vService, VirtualService.GROUP, VirtualService.VERSION, @namespace, serviceName, VirtualService.PLURAL);
+        try
+        {
+            await K8S.CreateNamespacedCustomObjectAsync
+                (vService, VirtualService.GROUP, VirtualService.VERSION, @namespace, VirtualService.PLURAL);
+        }
+        catch (HttpOperationException e)
+        {
+            Console.WriteLine(e);
+            throw;
+        }
+
         // Step 3: Tag pods
 
         await Task.WhenAll

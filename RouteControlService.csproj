@@ -27,8 +27,4 @@
 		<PackageReference Include="Z.EntityFramework.Extensions.EFCore" Version="7.22.3" />
 	</ItemGroup>
 
-	<ItemGroup>
-		<Folder Include="TestData\" />
-	</ItemGroup>
-
 </Project>

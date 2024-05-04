@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices.JavaScript;
 using k8s;
 using Microsoft.AspNetCore.Mvc;
 using RouteControlService;
@@ -15,14 +16,22 @@ builder.Configuration.AddPlaceholderResolver()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddCors();
+builder.Services.AddSingleton<DelegatingHandler[]>(new DelegatingHandler[] {});
 if (builder.Environment.IsProduction())
 {
     builder.Services.AddSingleton(KubernetesClientConfiguration.InClusterConfig());
     builder.Services.AddSingleton<Kubernetes>();
+}else if (builder.Environment.IsDevelopment())
+
+{
+    builder.Services.AddSingleton
+        (KubernetesClientConfiguration.BuildConfigFromConfigFile(builder.Configuration["K8s:profile"]));
+    builder.Services.AddSingleton<Kubernetes>();
 }
 
 
-builder.Services.AddSingleton<IRouteController, FakeRouteController>();
+
+builder.Services.AddSingleton<IRouteController, RouteController>();
 
 var app = builder.Build();
 

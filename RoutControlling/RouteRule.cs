@@ -10,6 +10,10 @@ public record RouteRuleExtraInfo(ushort PortNumber, string[] Hosts)
     public static RouteRuleExtraInfo Default { get; } = new(80, new[] { "*" });
 }
 
+public enum TrafficDirection
+{
+    In,Out
+}
 [Serializable]
 public record RouteRule
 (
@@ -22,10 +26,12 @@ public record RouteRule
     RouteRuleExtraInfo? ExtraInfo
 )
 {
-    public K8SResourceLabel AsLabel(bool isInbound)
+    public K8SResourceLabel AsLabel(TrafficDirection direction)
     {
-        return new($"route-ctl/{(isInbound ? "in" : "out")}/{Namespace}/{DesService}", Name);
+        return new($"route-ctl/{Enum.GetName(direction).ToLower()}--{Namespace}--{DesService}", Name);
     }
+
+    public K8SResourceLabel AsLabel(bool isInbound) => AsLabel(isInbound ? TrafficDirection.In : TrafficDirection.Out);
 }
 
 [Serializable] public record RouteRuleId(string Namespace, string DesService, string? Name);

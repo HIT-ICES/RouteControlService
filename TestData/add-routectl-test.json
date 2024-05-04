@@ -1,0 +1,29 @@
+﻿{
+  "namespace": "string",
+  "desService": "string",
+  "name": "string",
+  "srcPods": [
+    {
+      "namespace": "string",
+      "name": "string"
+    }
+  ],
+  "desPods": [
+    {
+      "namespace": "string",
+      "name": "string"
+    }
+  ],
+  "endpointControls": [
+    {
+      "uri": "string",
+      "useRegex": true
+    }
+  ],
+  "extraInfo": {
+    "portNumber": 0,
+    "hosts": [
+      "string"
+    ]
+  }
+}
