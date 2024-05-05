@@ -5,9 +5,9 @@
 [Serializable] public record EndpointControl(string Uri, bool? UseRegex);
 
 [Serializable]
-public record RouteRuleExtraInfo(ushort PortNumber, string[] Hosts)
+public record RouteRuleExtraInfo(ushort PortNumber)//, string[] Hosts)
 {
-    public static RouteRuleExtraInfo Default { get; } = new(80, new[] { "*" });
+    public static RouteRuleExtraInfo Default { get; } = new(80); //, new[] { "*" });
 }
 
 public enum TrafficDirection

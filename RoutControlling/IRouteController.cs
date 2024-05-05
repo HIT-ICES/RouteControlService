@@ -2,6 +2,7 @@
 
 public interface IRouteController
 {
+
     Task<RouteRule[]?> GetAllAsync(string @namespace, string serviceName);
     Task UpdateAllAsync(string @namespace, string serviceName, RouteRule[] newRules);
     Task CreateAllAsync(string @namespace, string serviceName, RouteRule[] newRules);
