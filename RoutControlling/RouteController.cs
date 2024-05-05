@@ -1,4 +1,5 @@
-﻿using k8s;
+﻿using System.Text.Json;
+using k8s;
 using k8s.Autorest;
 using k8s.Models;
 using Microsoft.AspNetCore.JsonPatch;
@@ -22,105 +23,28 @@ internal static class RouteCtl
         return new(patch, V1Patch.PatchType.JsonPatch);
     }
 
-    private static string SubsetNameOfLabel(K8SResourceLabel label) => $"Subset-{label.Key}-{label.Value}";
-
-    public static V1Patch AddSubsetPatch(DestinationRule destinationRule, K8SResourceLabel label)
-    {
-        var patch = new JsonPatchDocument<DestinationRule>();
-        var subsetList = destinationRule.Spec.Subsets ?? new();
-        subsetList.Insert
-        (
-            0,
-            new Subset
-            {
-                Labels = new()
-                         {
-                             { label.Key, label.Value }
-                         },
-                Name = SubsetNameOfLabel(label)
-            }
-        );
-        patch.Replace(d => d.Spec.Subsets, subsetList);
-        return patch.AsV1Patch();
-    }
-
-    public static V1Patch RemoveSubsetPatch(DestinationRule destinationRule, K8SResourceLabel label)
-    {
-        var patch = new JsonPatchDocument<DestinationRule>();
-        var subsetName = SubsetNameOfLabel(label);
-        var target = destinationRule.Spec.Subsets?.FindIndex(s => s.Name == subsetName);
-        if (target is { } targetIndex)
-            patch.Remove(p => p.Spec.Subsets![targetIndex]);
-        return patch.AsV1Patch();
-    }
-
-    public static V1Patch AddVServicePatch
-    (
-        string routeName,
-        RouteMatch? routeMatch,
-        VirtualService virtualService,
-        HostAddress host,
-        K8SResourceLabel label
-    )
-    {
-        var patch = new JsonPatchDocument<VirtualService>();
-        var subsetList = virtualService.Spec.Http ?? new();
-        subsetList.Insert
-        (
-            0,
-            new HttpRoute
-            {
-                Match = new()
-                        {
-                            new()
-                            {
-                                SourceLabels = new()
-                                               {
-                                                   { label.Key, label.Value }
-                                               },
-                                Uri = routeMatch?.ToStringMatch()
-                            }
-                        },
-                Route = new()
-                        {
-                            new()
-                            {
-                                Destination = new()
-                                              {
-                                                  Host = host.Hostname,
-                                                  Port = new PortSelector() { Number = host.Port },
-                                                  Subset = SubsetNameOfLabel(label)
-                                              }
-                            }
-                        },
-                Name = routeName
-            }
-        );
-        patch.Replace(d => d.Spec.Http, subsetList);
-        return patch.AsV1Patch();
-    }
-
-    public static V1Patch RemoveVServicePatch(string routeName, VirtualService virtualService)
-    {
-        var patch = new JsonPatchDocument<VirtualService>();
-        var target = virtualService.Spec.Http?.FindIndex(vs => vs.Name == routeName);
-        if (target is { } targetIndex)
-            patch.Remove(p => p.Spec.Http![targetIndex]);
-        return patch.AsV1Patch();
-    }
-
     public static V1Patch RemoveLabelPatch(K8SResourceLabel label)
     {
         var patch = new JsonPatchDocument<V1Pod>();
         patch.Remove(p => p.Metadata.Labels[label.Key]);
-        return patch.AsV1Patch();
+        var r = patch.AsV1Patch();
+        return r;
     }
 
     public static V1Patch AddLabelPatch(K8SResourceLabel label)
     {
-        var patch = new JsonPatchDocument<V1Pod>();
-        patch.Add(p => p.Metadata.Labels[label.Key], label.Value);
-        return patch.AsV1Patch();
+        // var patch = new JsonPatchDocument();
+        // patch.Add($"/metadata/labels/{label.Key}", label.Value);
+        var patchJson =
+            $$"""
+              [{
+                "op": "add",
+                "path": "/metadata/labels/{{label.Key}}",
+                "value": "{{label.Value}}"
+              }]
+              """;
+        var r = new V1Patch(patchJson, V1Patch.PatchType.JsonPatch);
+        return r;
     }
 }
 
@@ -136,10 +60,15 @@ public class RouteController(Kubernetes K8S, ILogger<RouteController> logger) : 
     {
         try
         {
-            await K8S.PatchNamespacedPodAsync(RouteCtl.AddLabelPatch(label), podRef.Name, podRef.Namespace);
+            var patch = RouteCtl.AddLabelPatch(label);
+            await K8S.PatchNamespacedPodAsync(patch, podRef.Name, podRef.Namespace);
+            logger.LogInformation("Add label {label} to pod {pod}", label, podRef);
         }
         catch (HttpOperationException ex)
         {
+            var serialized = JsonSerializer.Serialize(RouteCtl.AddLabelPatch(label));
+            ;
+            Console.WriteLine(serialized);
             Console.WriteLine(ex);
             throw;
         }
@@ -149,8 +78,8 @@ public class RouteController(Kubernetes K8S, ILogger<RouteController> logger) : 
     public async Task<RouteRule[]?> GetAllAsync(string @namespace, string serviceName)
     {
         var pods = await K8S.ListPodForAllNamespacesAsync();
-        var srcLabel = $"route-ctl/out--{@namespace}--{serviceName}";
-        var desLabel = $"route-ctl/in--{@namespace}--{serviceName}";
+        var srcLabel = $"route-ctl-out--{@namespace}--{serviceName}";
+        var desLabel = $"route-ctl-in--{@namespace}--{serviceName}";
         var rules = new Dictionary<string, (List<K8sResourceId>, List<K8sResourceId>, List<EndpointControl>)>();
 
         foreach (var pod in pods)
@@ -267,6 +196,7 @@ public class RouteController(Kubernetes K8S, ILogger<RouteController> logger) : 
                                Name = serviceName
                            }
                        };
+        destRule.Spec.Host = serviceName;
         destRule.Spec.Subsets =
             newRules.Select
                      (
@@ -390,10 +320,10 @@ public class RouteController(Kubernetes K8S, ILogger<RouteController> logger) : 
         (
             newRules.SelectMany
             (
-                r => r.SrcPods.Select(p => TagInstance(p, r.AsLabel(false)))
+                r => r.SrcPods.Select(p => TagInstance(p, r.AsLabel(TrafficDirection.Out)))
                       .Concat
                        (
-                           r.DesPods.Select(p => TagInstance(p, r.AsLabel(true)))
+                           r.DesPods.Select(p => TagInstance(p, r.AsLabel(TrafficDirection.In)))
                        )
             )
         );

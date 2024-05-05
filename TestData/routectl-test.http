@@ -1,6 +1,7 @@
-﻿GET http://192.168.1.104:32395/?ttl=4
-
-### Create Rules: 所有结点入都会从    {"namespace": "mpp-master-bdf9c5bdf-wk7zm", "name": "routectl-test"} 返回
+﻿GET http://192.168.1.104:32395/?ttl=3
+###
+GET http://10.123.3.1:32395/?ttl=3
+### Create Rules: 所有结点入都会从    {"namespace": "mpp-master-bdf9c5bdf-qt6qx", "name": "routectl-test"} 返回
 #    }
 
 POST http://localhost:8088/route-rules/add?allowOverwrite=true
@@ -37,7 +38,7 @@ Content-Type: application/json
   ],
   "endpointControls": [],
   "extraInfo": {
-    "portNumber": "80"aa
+    "portNumber": "80"
   }
 }
 

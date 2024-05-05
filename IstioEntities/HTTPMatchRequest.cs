@@ -17,7 +17,7 @@ public class HTTPMatchRequest
 
     [JsonPropertyName("headers")] public Dictionary<string, StringMatch>? Headers { get; set; }
 
-    [JsonPropertyName("port")] public uint Port { get; set; }
+    [JsonPropertyName("port")] public uint? Port { get; set; }
 
     [JsonPropertyName("sourceLabels")] public Dictionary<string, string>? SourceLabels { get; set; }
 

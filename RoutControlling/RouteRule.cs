@@ -28,7 +28,7 @@ public record RouteRule
 {
     public K8SResourceLabel AsLabel(TrafficDirection direction)
     {
-        return new($"route-ctl/{Enum.GetName(direction).ToLower()}--{Namespace}--{DesService}", Name);
+        return new($"route-ctl-{Enum.GetName(direction).ToLower()}--{Namespace}--{DesService}", Name);
     }
 
     public K8SResourceLabel AsLabel(bool isInbound) => AsLabel(isInbound ? TrafficDirection.In : TrafficDirection.Out);
