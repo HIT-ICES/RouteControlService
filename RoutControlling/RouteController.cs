@@ -178,8 +178,11 @@ public class RouteController(Kubernetes kubernetes, ILogger<RouteController> log
     {
         var (@namespace, serviceName) = serviceRef;
         var resName = ResName(serviceName);
-        if (newRules is [])
+
+        await CheckRules(newRules);
+        try
         {
+            AcquireLock(serviceRef);
             try
             {
                 await kubernetes.DeleteNamespacedCustomObjectAsync
@@ -203,38 +206,13 @@ public class RouteController(Kubernetes kubernetes, ILogger<RouteController> log
             {
                 throw new RouteControllingException("Failed to delete resources", ex);
             }
-
-            return;
+            await CreateAllInternal(newRules, serviceName, @namespace);
         }
-
-        await CheckRules(newRules);
-
-        var (destRule, vService) = RulesToResources(serviceName, newRules);
-        try
+        finally
         {
-            await kubernetes.ReplaceNamespacedCustomObjectAsync
-            (
-                destRule,
-                DestinationRule.GROUP,
-                DestinationRule.VERSION,
-                @namespace,
-                DestinationRule.PLURAL,
-                resName
-            );
-            await kubernetes.ReplaceNamespacedCustomObjectAsync
-            (
-                vService,
-                VirtualService.GROUP,
-                VirtualService.VERSION,
-                @namespace,
-                VirtualService.PLURAL,
-                resName
-            );
+            ReleaseLock(serviceRef);
         }
-        catch (HttpOperationException ex)
-        {
-            throw new RouteControllingException("Failed to update resources", ex);
-        }
+
     }
 
     /// <inheritdoc />
@@ -242,6 +220,20 @@ public class RouteController(Kubernetes kubernetes, ILogger<RouteController> log
     {
         var (@namespace, serviceName) = serviceRef;
         await CheckRules(newRules);
+        try
+        {
+            AcquireLock(serviceRef);
+            await CreateAllInternal(newRules, serviceName, @namespace);
+        }
+        finally
+        {
+            ReleaseLock(serviceRef);
+        }
+
+    }
+
+    private async Task CreateAllInternal(RouteRule[] newRules, string serviceName, string @namespace)
+    {
         var (destRule, vService) = RulesToResources(serviceName, newRules);
         try
         {
