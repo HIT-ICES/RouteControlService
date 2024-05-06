@@ -1,0 +1,52 @@
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  creationTimestamp: "2024-05-06T11:19:49Z"
+  generation: 1
+  name: routectl-mpp
+  namespace: routectl-test
+  resourceVersion: "233015511"
+  uid: eca11ed4-8f45-4b95-af6b-f4a7fed06e45
+spec:
+  host: mpp
+  subsets:
+  - labels:
+      routectl-name: mpp-1-8588786769-jwnhp
+      routectl-ns: routectl-test
+    name: mpp-1-8588786769-jwnhp
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  creationTimestamp: "2024-05-06T11:19:49Z"
+  generation: 1
+  name: routectl-mpp
+  namespace: routectl-test
+spec:
+  hosts:
+  - mpp
+  http:
+  - match:
+    - name: mpp-test
+      sourceLabels:
+        routectl-name: mpp-2-8588786769-9bcz2
+        routectl-ns: routectl-test
+    - name: mpp-test
+      sourceLabels:
+        routectl-name: mpp-2-8588786769-bwbrg
+        routectl-ns: routectl-test
+    - name: mpp-test
+      sourceLabels:
+        routectl-name: mpp-2-8588786769-hd4l9
+        routectl-ns: routectl-test
+    - name: mpp-test
+      sourceLabels:
+        routectl-name: mpp-1-8588786769-jwnhp
+        routectl-ns: routectl-test
+    name: mpp-test
+    route:
+    - destination:
+        host: mpp
+        port:
+          number: 80
+        subset: mpp-1-8588786769-jwnhp

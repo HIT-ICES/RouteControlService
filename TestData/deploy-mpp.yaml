@@ -1,0 +1,109 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: mpp
+  namespace: routectl-test
+  labels:
+    app: mpp
+spec:
+  ports:
+    - name: http-80
+      protocol: TCP
+      port: 80
+      targetPort: 80
+      nodePort: 32395
+  selector:
+    app: mpp
+  type: NodePort
+  sessionAffinity: None
+  externalTrafficPolicy: Cluster
+  ipFamilies:
+    - IPv4
+  ipFamilyPolicy: SingleStack
+  internalTrafficPolicy: Cluster
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: mpp-1
+  namespace: routectl-test
+  labels:
+    app: mpp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mpp
+  template:
+    metadata:
+      labels:
+        app: mpp
+        routectl-name: ''
+        routectl-ns: ''
+    spec:
+      containers:
+        - name: container-wo3ch2
+          image: "192.168.1.104:5000/cloud-collaboration-platform/mcs-ping-pong:0.2"
+          ports:
+            - name: tcp-80
+              containerPort: 80
+              protocol: TCP
+          env:
+            - name: APP_URL
+              value: "http://mpp/"
+            - name: INSTANCE_ID
+              value: master
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          imagePullPolicy: IfNotPresent
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      serviceAccountName: default
+      serviceAccount: default
+      securityContext: {}
+      schedulerName: default-scheduler
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: mpp-2
+  namespace: routectl-test
+  labels:
+    app: mpp
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mpp
+  template:
+    metadata:
+      labels:
+        app: mpp
+        routectl-name: ''
+        routectl-ns: ''
+    spec:
+      containers:
+        - name: container-wo3ch2
+          image: "192.168.1.104:5000/cloud-collaboration-platform/mcs-ping-pong:0.2"
+          ports:
+            - name: tcp-80
+              containerPort: 80
+              protocol: TCP
+          env:
+            - name: APP_URL
+              value: "http://mpp/"
+            - name: INSTANCE_ID
+              value: master
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          imagePullPolicy: IfNotPresent
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      serviceAccountName: default
+      serviceAccount: default
+      securityContext: {}
+      schedulerName: default-scheduler
