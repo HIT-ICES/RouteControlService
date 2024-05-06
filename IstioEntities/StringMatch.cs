@@ -2,12 +2,7 @@
 
 namespace RouteControlService.IstioEntities;
 
-public enum StringMatchType
-{
-    Exact,
-    Prefix,
-    Regex
-}
+public enum StringMatchType { Exact, Prefix, Regex }
 
 [Serializable]
 public class StringMatch : Dictionary<string, string>
@@ -16,11 +11,11 @@ public class StringMatch : Dictionary<string, string>
     public StringMatchType Type
     {
         get => this.FirstOrDefault().Key switch
-        {
-            "exact" => StringMatchType.Exact,
-            "prefix" => StringMatchType.Prefix,
-            _ => StringMatchType.Regex
-        };
+               {
+                   "exact" => StringMatchType.Exact,
+                   "prefix" => StringMatchType.Prefix,
+                   _ => StringMatchType.Regex
+               };
         set
         {
             var val = this.FirstOrDefault().Value;

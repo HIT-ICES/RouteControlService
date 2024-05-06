@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices.JavaScript;
 using k8s;
 using Microsoft.AspNetCore.Mvc;
 using RouteControlService;
@@ -16,19 +15,19 @@ builder.Configuration.AddPlaceholderResolver()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddCors();
-builder.Services.AddSingleton<DelegatingHandler[]>(new DelegatingHandler[] {});
+builder.Services.AddSingleton(new DelegatingHandler[] { });
 if (builder.Environment.IsProduction())
 {
     builder.Services.AddSingleton(KubernetesClientConfiguration.InClusterConfig());
     builder.Services.AddSingleton<Kubernetes>();
-}else if (builder.Environment.IsDevelopment())
+}
+else if (builder.Environment.IsDevelopment())
 
 {
     builder.Services.AddSingleton
         (KubernetesClientConfiguration.BuildConfigFromConfigFile(builder.Configuration["K8s:profile"]));
     builder.Services.AddSingleton<Kubernetes>();
 }
-
 
 
 builder.Services.AddSingleton<IRouteController, RouteController>();
@@ -47,7 +46,7 @@ app.MapPost
         "/route-rules/all",
         async ([FromQuery] bool exact, [FromBody] RouteRuleId id) =>
         {
-            var all = await routectl.GetAllAsync(id.Namespace, id.DesService);
+            var all = await routectl.GetAllAsync(new KubernetesResourceId(id.Namespace, id.DesService));
             return all != null
                        ? Ok
                        (
@@ -70,22 +69,20 @@ app.MapPost
         "/route-rules/add",
         async ([FromQuery] bool allowOverwrite, [FromBody] RouteRule rule) =>
         {
-            var all = await routectl.GetAllAsync(rule.Namespace, rule.DesService);
+            var seviceRef = new KubernetesResourceId(rule.Namespace, rule.DesService);
+            var all = await routectl.GetAllAsync(seviceRef);
             if (all is null)
             {
-                await routectl.CreateAllAsync(rule.Namespace, rule.DesService, new[] { rule });
+                await routectl.CreateAllAsync(seviceRef, [rule]);
             }
             else
             {
                 if (all.Any(r => r.Name == rule.Name) && !allowOverwrite)
-                {
                     return MResponse.Failed("Failed To add route rule: Already Existing!");
-                }
 
                 await routectl.UpdateAllAsync
                 (
-                    rule.Namespace,
-                    rule.DesService,
+                    seviceRef,
                     all.Where(r => r.Name != rule.Name).Append(rule).ToArray()
                 );
             }
@@ -101,16 +98,14 @@ app.MapPost
         "/route-rules/delete",
         async ([FromQuery] bool exact, [FromBody] RouteRuleId id) =>
         {
-            var all = await routectl.GetAllAsync(id.Namespace, id.DesService);
+            var serviceRef = new KubernetesResourceId(id.Namespace, id.DesService);
+            var all = await routectl.GetAllAsync(serviceRef);
             if (all is not null)
-            {
                 await routectl.UpdateAllAsync
                 (
-                    id.Namespace,
-                    id.DesService,
+                    serviceRef,
                     all.Where(r => exact ? r.Name != id.Name : !r.Name.Contains(r.Name)).ToArray()
                 );
-            }
 
             return MResponse.Successful();
         }

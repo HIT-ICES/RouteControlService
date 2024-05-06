@@ -1,6 +1,8 @@
 ﻿GET http://192.168.1.104:32395/?ttl=3
+
 ###
 GET http://10.123.3.1:32395/?ttl=3
+
 ### Create Rules: 所有结点入都会从    {"namespace": "mpp-master-bdf9c5bdf-qt6qx", "name": "routectl-test"} 返回
 #    }
 

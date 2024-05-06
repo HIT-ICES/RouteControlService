@@ -2,8 +2,10 @@
 
 // Refer to https://istio.io/latest/docs/reference/config/networking/virtual-service/
 namespace RouteControlService.IstioEntities;
+
 [Serializable]
-public class VirtualService() : CustomResource<VirtualServiceSpec>("VirtualService", $"{GROUP}/{VERSION}", new())
+public class VirtualService() : CustomResource<VirtualServiceSpec>
+    ("VirtualService", $"{GROUP}/{VERSION}", new VirtualServiceSpec())
 {
     public static readonly string PLURAL = "virtualservices";
     public static readonly string GROUP = "networking.istio.io";

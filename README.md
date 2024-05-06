@@ -16,8 +16,6 @@ LISTER_PORT: 80 # 工作端口
 
 **可以直接使用环境变量来覆盖这些配置。**
 
-
-
 ## 构建
 
 可以在k8s节点上直接构建和部署。
@@ -33,12 +31,12 @@ make install
 1. 利用label对pod们进行标记
 2. 利用ISTIO的DestinationRule，将目标pod标记为某一subset
 3. 获取ISTIO的VService，对目标pod所属的Service路由规则进行改写
-	1. 增加/查找条目，sourceLabels和endPoint(http.uri.exact/prefix)匹配的情况
-	2. 修改destination.subset
+    1. 增加/查找条目，sourceLabels和endPoint(http.uri.exact/prefix)匹配的情况
+    2. 修改destination.subset
 
 因此，一条路由规则是一个元组: `(Namespace:str,DesService:str,SrcPods:PodId[],DesPods:PodId[],EndpointControl[])`
 
-为了方便起见，我们给它起一个友好的名字，扩展元组为 
+为了方便起见，我们给它起一个友好的名字，扩展元组为
 `(Namespace:str,DesService:str,FriendlyName:str,SrcPods:PodId[],DesPods:PodId[],EndpointControl[])`，
 记作`record RouteRule`
 然后，我们**规定**`(Namespace:str,DesService:str,FriendlyName:str)`可以唯一确定这样的一个元组，记作`record RouteRuleId`。
@@ -54,8 +52,6 @@ make install
 
 1. 假定用户不会手动修改ISTIO资源
 2. 假定这些路由规则间不存在冲突，可以正常工作
-
-
 
 ## 目录结构
 
