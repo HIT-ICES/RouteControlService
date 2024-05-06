@@ -1,0 +1,109 @@
+﻿apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  creationTimestamp: "2024-05-06T11:04:51Z"
+  generation: 1
+  name: routectl-mpp
+  namespace: routectl-test
+  resourceVersion: "232998958"
+  uid: 1c668cd0-58ab-46e6-b68e-c3310e346c97
+spec:
+  hosts:
+  - mpp
+  http:
+  - match:
+    - name: mpp-test
+      sourceLabels:
+        routectl-name: mpp-2-8588786769-9bcz2
+        routectl-ns: routectl-test
+    - name: mpp-test
+      sourceLabels:
+        routectl-name: mpp-2-8588786769-bwbrg
+        routectl-ns: routectl-test
+    - name: mpp-test
+      sourceLabels:
+        routectl-name: mpp-2-8588786769-hd4l9
+        routectl-ns: routectl-test
+    - name: mpp-test
+      sourceLabels:
+        routectl-name: mpp-1-8588786769-jwnhp
+        routectl-ns: routectl-test
+    name: mpp-test
+    route:
+    - destination:
+        host: mpp
+        port:
+          number: 80
+        subset: mpp-1-8588786769-jwnhp
+  - match:
+    - name: mpp-test
+      sourceLabels:
+        routectl-name: mpp-2-8588786769-9bcz2
+        routectl-ns: routectl-test
+    - name: mpp-test
+      sourceLabels:
+        routectl-name: mpp-2-8588786769-bwbrg
+        routectl-ns: routectl-test
+    - name: mpp-test
+      sourceLabels:
+        routectl-name: mpp-2-8588786769-hd4l9
+        routectl-ns: routectl-test
+    - name: mpp-test
+      sourceLabels:
+        routectl-name: mpp-1-8588786769-jwnhp
+        routectl-ns: routectl-test
+    name: mpp-test
+    route:
+    - destination:
+        host: mpp
+        port:
+          number: 80
+        subset: mpp-1-8588786769-jwnhp
+  - match:
+    - name: mpp-test
+      sourceLabels:
+        routectl-name: mpp-2-8588786769-9bcz2
+        routectl-ns: routectl-test
+    - name: mpp-test
+      sourceLabels:
+        routectl-name: mpp-2-8588786769-bwbrg
+        routectl-ns: routectl-test
+    - name: mpp-test
+      sourceLabels:
+        routectl-name: mpp-2-8588786769-hd4l9
+        routectl-ns: routectl-test
+    - name: mpp-test
+      sourceLabels:
+        routectl-name: mpp-1-8588786769-jwnhp
+        routectl-ns: routectl-test
+    name: mpp-test
+    route:
+    - destination:
+        host: mpp
+        port:
+          number: 80
+        subset: mpp-1-8588786769-jwnhp
+  - match:
+    - name: mpp-test
+      sourceLabels:
+        routectl-name: mpp-2-8588786769-9bcz2
+        routectl-ns: routectl-test
+    - name: mpp-test
+      sourceLabels:
+        routectl-name: mpp-2-8588786769-bwbrg
+        routectl-ns: routectl-test
+    - name: mpp-test
+      sourceLabels:
+        routectl-name: mpp-2-8588786769-hd4l9
+        routectl-ns: routectl-test
+    - name: mpp-test
+      sourceLabels:
+        routectl-name: mpp-1-8588786769-jwnhp
+        routectl-ns: routectl-test
+    name: mpp-test
+    route:
+    - destination:
+        host: mpp
+        port:
+          number: 80
+        subset: mpp-1-8588786769-jwnhp

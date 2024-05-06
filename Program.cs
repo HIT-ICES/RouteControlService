@@ -39,26 +39,33 @@ app.UseCors(cors => cors.AllowAnyMethod().AllowAnyOrigin().AllowAnyHeader());
 app.UseSwagger();
 app.UseSwaggerUI();
 
-var routectl = app.Services.GetRequiredService<IRouteController>();
+var routeController = app.Services.GetRequiredService<IRouteController>();
 
 app.MapPost
     (
         "/route-rules/all",
         async ([FromQuery] bool exact, [FromBody] RouteRuleId id) =>
         {
-            var all = await routectl.GetAllAsync(new KubernetesResourceId(id.Namespace, id.DesService));
-            return all != null
-                       ? Ok
-                       (
-                           all.Where
-                               (
-                                   r => exact
-                                            ? r.Name == id.Name
-                                            : string.IsNullOrWhiteSpace(id.Name) || r.Name.Contains(id.Name ?? "")
-                               )
-                              .ToArray()
-                       )
-                       : Ok(Array.Empty<RouteRule>());
+            try
+            {
+                var all = await routeController.GetAllAsync(new KubernetesResourceId(id.Namespace, id.DesService));
+                return all != null
+                           ? Ok
+                           (
+                               all.Where
+                                   (
+                                       r => exact
+                                                ? r.Name == id.Name
+                                                : string.IsNullOrWhiteSpace(id.Name) || r.Name.Contains(id.Name ?? "")
+                                   )
+                                  .ToArray()
+                           )
+                           : Ok(Array.Empty<RouteRule>());
+            }
+            catch (RouteControllingException e)
+            {
+                return onRouteControllingException(e, $"/route-rules/all?exact={exact}");
+            }
         }
     )
    .WithName("Get all route rules")
@@ -69,25 +76,34 @@ app.MapPost
         "/route-rules/add",
         async ([FromQuery] bool allowOverwrite, [FromBody] RouteRule rule) =>
         {
-            var seviceRef = new KubernetesResourceId(rule.Namespace, rule.DesService);
-            var all = await routectl.GetAllAsync(seviceRef);
-            if (all is null)
+            var serviceRef = new KubernetesResourceId(rule.Namespace, rule.DesService);
+            var uri = $"/route-rules/add?allowOverwrite={allowOverwrite}";
+            try
             {
-                await routectl.CreateAllAsync(seviceRef, [rule]);
+                var all = await routeController.GetAllAsync(serviceRef);
+                if (all is null)
+                {
+                    await routeController.CreateAllAsync(serviceRef, [rule]);
+                }
+                else
+                {
+                    if (all.Any(r => r.Name == rule.Name) && !allowOverwrite)
+                        return Conflict(MResponse.Failed("Failed To add route rule: Already Existing!"));
+
+                    await routeController.UpdateAllAsync
+                    (
+                        serviceRef,
+                        all.Where(r => r.Name != rule.Name).Append(rule).ToArray()
+                    );
+                }
             }
-            else
+            catch (RouteControllingException e)
             {
-                if (all.Any(r => r.Name == rule.Name) && !allowOverwrite)
-                    return MResponse.Failed("Failed To add route rule: Already Existing!");
-
-                await routectl.UpdateAllAsync
-                (
-                    seviceRef,
-                    all.Where(r => r.Name != rule.Name).Append(rule).ToArray()
-                );
+                return onRouteControllingException(e, uri);
             }
 
-            return MResponse.Successful();
+
+            return Ok(MResponse.Successful());
         }
     )
    .WithName("Create or Update route rule")
@@ -99,18 +115,55 @@ app.MapPost
         async ([FromQuery] bool exact, [FromBody] RouteRuleId id) =>
         {
             var serviceRef = new KubernetesResourceId(id.Namespace, id.DesService);
-            var all = await routectl.GetAllAsync(serviceRef);
-            if (all is not null)
-                await routectl.UpdateAllAsync
-                (
-                    serviceRef,
-                    all.Where(r => exact ? r.Name != id.Name : !r.Name.Contains(r.Name)).ToArray()
-                );
+            try
+            {
+                var all = await routeController.GetAllAsync(serviceRef);
+                if (all is not null)
+                    await routeController.UpdateAllAsync
+                    (
+                        serviceRef,
+                        all.Where(r => exact ? r.Name != id.Name : !r.Name.Contains(r.Name)).ToArray()
+                    );
+            }
+            catch (RouteControllingException e)
+            {
+                return onRouteControllingException(e, $"/route-rules/delete?exact={exact}");
+            }
 
-            return MResponse.Successful();
+            return Ok(MResponse.Successful());
         }
     )
    .WithName("Delete route rules")
    .WithOpenApi();
 
 app.Run();
+return;
+
+IResult onRouteControllingException(RouteControllingException routeControllingException, string uri)
+{
+    switch (routeControllingException.Type)
+    {
+    case RouteControllingExceptionType.BadUpstream:
+        return Problem
+        (
+            routeControllingException.Message,
+            uri,
+            503,
+            "Upstream Down",
+            Enum.GetName(routeControllingException.Type)
+        );
+    case RouteControllingExceptionType.UnmanagedPods:
+        return BadRequest(routeControllingException);
+    case RouteControllingExceptionType.ConcurrencyConflict:
+        return Conflict(routeControllingException);
+    default:
+        return Problem
+        (
+            routeControllingException.Message,
+            uri,
+            500,
+            "Upstream Down",
+            Enum.GetName(routeControllingException.Type)
+        );
+    }
+}

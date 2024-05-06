@@ -1,9 +1,9 @@
-﻿GET http://192.168.1.104:32395/?ttl=3
+﻿GET http://192.168.1.104:32395/?ttl=5
 
 ###
 GET http://10.123.3.1:32395/?ttl=3
 
-### Create Rules: 所有结点入都会从    {"namespace": "mpp-master-bdf9c5bdf-qt6qx", "name": "routectl-test"} 返回
+### Create Rules: 所有结点入都会从    {"namespace": "mpp-1-8588786769-jwnhp", "name": "routectl-test"} 返回
 #    }
 
 POST http://localhost:8088/route-rules/add?allowOverwrite=true
@@ -16,25 +16,25 @@ Content-Type: application/json
   "name": "mpp-test",
   "srcPods": [
     {
-      "name": "mpp-master-bdf9c5bdf-wk7zm",
+      "name": "mpp-2-8588786769-9bcz2",
       "namespace": "routectl-test"
     },
     {
-      "name": "mpp-master-bdf9c5bdf-ppgpg",
+      "name": "mpp-2-8588786769-bwbrg",
       "namespace": "routectl-test"
     },
     {
-      "name": "mpp-master-bdf9c5bdf-thbcg",
+      "name": "mpp-2-8588786769-hd4l9",
       "namespace": "routectl-test"
     },
     {
-      "name": "mpp-master-bdf9c5bdf-wk7zm",
+      "name": "mpp-1-8588786769-jwnhp",
       "namespace": "routectl-test"
     }
   ],
   "desPods": [
     {
-      "name": "mpp-master-bdf9c5bdf-qt6qx",
+      "name": "mpp-1-8588786769-jwnhp",
       "namespace": "routectl-test"
     }
   ],
@@ -44,5 +44,14 @@ Content-Type: application/json
   }
 }
 
-###
+### GetAll
 
+POST http://localhost:8088/route-rules/all?exact=true
+accept: application/json
+Content-Type: application/json
+
+{
+  "namespace": "routectl-test",
+  "desService": "mpp",
+  "name": "mpp-test"
+}

@@ -10,6 +10,7 @@ public class RouteController(Kubernetes kubernetes, ILogger<RouteController> log
 {
     private const string kLabelName = "routectl-name";
     private const string kLabelNs = "routectl-ns";
+    private const string kLabelSvc = "service"; // required for ISTIO
 
     private readonly ConcurrentDictionary<KubernetesResourceId, byte> _locks = new();
 
@@ -270,25 +271,35 @@ public class RouteController(Kubernetes kubernetes, ILogger<RouteController> log
     //private string DestinationRuleName(string serviceName) => $"routectl-{serviceName}";
     private string ResName(string serviceName) { return $"routectl-{serviceName}"; }
 
-    public static V1Patch HandleLabelPatch(KubernetesResourceId id)
+    /// <summary>
+    ///     To label certain pod (service instance).
+    ///     As the label finally working with ISTIO route controlling is the label of pod, we don't need to label deployments.
+    /// </summary>
+    /// <param name="svcRef"></param>
+    private async Task<bool> AutoFixService(KubernetesResourceId svcRef)
     {
-        var patchJson =
-            $$"""
-              [
-                  {
-                    "op": "replace",
-                    "path": "/metadata/labels/{{kLabelNs}}",
-                    "value": "{{id.Namespace}}"
-                  },
-                  {
-                    "op": "replace",
-                    "path": "/metadata/labels/{{kLabelName}}",
-                    "value": "{{id.Name}}"
-                  }
-              ]
-              """;
-        var r = new V1Patch(patchJson, V1Patch.PatchType.JsonPatch);
-        return r;
+        try
+        {
+            var patchJson =
+                $$"""
+                  [
+                      {
+                        "op": "add",
+                        "path": "/metadata/labels/{{kLabelSvc}}",
+                        "value": "{{svcRef.Name}}"
+                      }
+                  ]
+                  """;
+            var patch = new V1Patch(patchJson, V1Patch.PatchType.JsonPatch);
+            await kubernetes.PatchNamespacedServiceAsync(patch, svcRef.Name, svcRef.Namespace);
+            logger.LogInformation("Fixed service label for service {pod}", svcRef);
+            return true;
+        }
+        catch (HttpOperationException)
+        {
+            logger.LogWarning("Failed to fix service label for service {pod}", svcRef);
+            return false;
+        }
     }
 
     /// <summary>
@@ -300,7 +311,22 @@ public class RouteController(Kubernetes kubernetes, ILogger<RouteController> log
     {
         try
         {
-            var patch = HandleLabelPatch(podRef);
+            var patchJson =
+                $$"""
+                  [
+                      {
+                        "op": "replace",
+                        "path": "/metadata/labels/{{kLabelNs}}",
+                        "value": "{{podRef.Namespace}}"
+                      },
+                      {
+                        "op": "replace",
+                        "path": "/metadata/labels/{{kLabelName}}",
+                        "value": "{{podRef.Name}}"
+                      }
+                  ]
+                  """;
+            var patch = new V1Patch(patchJson, V1Patch.PatchType.JsonPatch);
             await kubernetes.PatchNamespacedPodAsync(patch, podRef.Name, podRef.Namespace);
             logger.LogInformation("Fixed handle label for pod {pod}", podRef);
             return true;
@@ -329,7 +355,7 @@ public class RouteController(Kubernetes kubernetes, ILogger<RouteController> log
             string? ns = null, name = null;
             if (await kubernetes.ListPodForAllNamespacesAsync() is not { } pods)
                 throw new RouteControllingException
-                    ("Failed to get available pods", RouteControllingExceptionType.BadPodLabels);
+                    ("Failed to get available pods", RouteControllingExceptionType.BadUpstream);
 
             foreach (var item in pods.Items)
             {
@@ -367,8 +393,27 @@ public class RouteController(Kubernetes kubernetes, ILogger<RouteController> log
         return availablePods;
     }
 
+    private async Task CheckServices(KubernetesResourceId svcRef)
+    {
+        if (await kubernetes.ReadNamespacedServiceAsync(svcRef.Name, svcRef.Namespace) is not V1Service service)
+            throw new RouteControllingException
+                ("Failed to get available pods", RouteControllingExceptionType.BadUpstream);
+        if (!service.Metadata.Labels.TryGetValue(kLabelSvc, out _))
+        {
+            logger.LogWarning
+            (
+                "Found Service without service label: {svc}@{podns} fixing ...",
+                service.Name(),
+                service.Namespace()
+            );
+            await AutoFixService(svcRef);
+        }
+    }
+
     private async Task CheckRules(RouteRule[] newRules, HashSet<KubernetesResourceId>? availablePods = null)
     {
+        if (newRules.Length == 0) return;
+        await CheckServices(new(newRules[0].Namespace, newRules[0].DesService));
         availablePods ??= await GetAvailablePods(true);
         foreach (var pod in newRules.SelectMany(r => r.SrcPods.Concat(r.DesPods)))
         {
@@ -440,56 +485,53 @@ public class RouteController(Kubernetes kubernetes, ILogger<RouteController> log
                                Http =
                                [
                                    ..
-                                   newRules.SelectMany
+                                   newRules.Select
                                    (
-                                       r => r.SrcPods.Select
-                                       (
-                                           src => new HttpRoute
-                                                  {
-                                                      Name = r.Name,
-                                                      Route =
-                                                      [
-                                                          ..
-                                                          r.DesPods.Select
-                                                          (
-                                                              des =>
-                                                                  new HttpRouteDestination
-                                                                  {
-                                                                      Destination =
-                                                                          new Destination
-                                                                          {
-                                                                              Host = serviceName,
-                                                                              Port = new PortSelector
-                                                                                  {
-                                                                                      Number =
-                                                                                          r.ExtraInfo
-                                                                                            ?.PortNumber
-                                                                                       ?? 80
-                                                                                  },
-                                                                              Subset = des.Name
-                                                                          }
-                                                                  }
-                                                          )
-                                                      ],
-                                                      Match =
-                                                      [
-                                                          .. (r.EndpointControls is null or []
-                                                                  ? [null]
-                                                                  : r.EndpointControls.Cast<EndpointControl?>())
-                                                         .SelectMany
-                                                          (
-                                                              epc => r.SrcPods.Select
-                                                              (
-                                                                  src => new HTTPMatchRequest
-                                                                         {
-                                                                             Name = r.Name,
-                                                                             SourceLabels =
-                                                                                 new Dictionary<string, string>
-                                                                                 {
-                                                                                     { kLabelName, src.Name },
-                                                                                     { kLabelNs, src.Namespace }
-                                                                                 },
-                                                                             Uri = epc is null
+                                       r => new HttpRoute
+                                            {
+                                                Name = r.Name,
+                                                Route =
+                                                [
+                                                    ..
+                                                    r.DesPods.Select
+                                                    (
+                                                        des =>
+                                                            new HttpRouteDestination
+                                                            {
+                                                                Destination =
+                                                                    new Destination
+                                                                    {
+                                                                        Host = serviceName,
+                                                                        Port = new PortSelector
+                                                                               {
+                                                                                   Number =
+                                                                                       r.ExtraInfo
+                                                                                         ?.PortNumber
+                                                                                    ?? 80
+                                                                               },
+                                                                        Subset = des.Name
+                                                                    }
+                                                            }
+                                                    )
+                                                ],
+                                                Match =
+                                                [
+                                                    .. (r.EndpointControls is null or []
+                                                            ? [null]
+                                                            : r.EndpointControls.Cast<EndpointControl?>())
+                                                   .SelectMany
+                                                    (
+                                                        epc => r.SrcPods.Select
+                                                        (
+                                                            src => new HTTPMatchRequest
+                                                                   {
+                                                                        SourceLabels =
+                                                                           new Dictionary<string, string>
+                                                                           {
+                                                                               { kLabelName, src.Name },
+                                                                               { kLabelNs, src.Namespace }
+                                                                           },
+                                                                       Uri = epc is null
                                                                                  ? null
                                                                                  : new StringMatch
                                                                                      {
@@ -507,12 +549,11 @@ public class RouteController(Kubernetes kubernetes, ILogger<RouteController> log
                                                                                                         .Prefix
                                                                                              }
                                                                                      }
-                                                                         }
-                                                              )
-                                                          )
-                                                      ]
-                                                  }
-                                       )
+                                                                   }
+                                                        )
+                                                    )
+                                                ]
+                                            }
                                    )
                                ]
                            }
