@@ -16,25 +16,13 @@ Content-Type: application/json
   "name": "mpp-test",
   "srcPods": [
     {
-      "name": "mpp-2-8588786769-9bcz2",
-      "namespace": "routectl-test"
-    },
-    {
-      "name": "mpp-2-8588786769-bwbrg",
-      "namespace": "routectl-test"
-    },
-    {
-      "name": "mpp-2-8588786769-hd4l9",
-      "namespace": "routectl-test"
-    },
-    {
-      "name": "mpp-1-8588786769-jwnhp",
+      "name": "mpp**",
       "namespace": "routectl-test"
     }
   ],
   "desPods": [
     {
-      "name": "mpp-1-8588786769-jwnhp",
+      "name": "mpp-1**",
       "namespace": "routectl-test"
     }
   ],
@@ -46,12 +34,12 @@ Content-Type: application/json
 
 ### GetAll
 
-POST http://localhost:8088/route-rules/all?exact=true
+POST http://localhost:8088/route-rules/all?exact=false
 accept: application/json
 Content-Type: application/json
 
 {
   "namespace": "routectl-test",
   "desService": "mpp",
-  "name": "mpp-test"
+  "name": ""
 }

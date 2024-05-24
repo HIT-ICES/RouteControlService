@@ -1,5 +1,5 @@
 IMAGE_NAME = real-route-control-service
-IMAGE_TAG = 0.2
+IMAGE_TAG = 0.2.1
 DOCKERFILE_DIR = .
 WORK_DIR = .
 REPO_NAME = 192.168.1.104:5000/cloud-collaboration-platform

@@ -153,9 +153,23 @@ IResult onRouteControllingException(RouteControllingException routeControllingEx
             Enum.GetName(routeControllingException.Type)
         );
     case RouteControllingExceptionType.UnmanagedPods:
-        return BadRequest(routeControllingException);
+        return BadRequest
+        (
+            new
+            {
+                Type = Enum.GetName(routeControllingException.Type), routeControllingException.Message,
+                routeControllingException.Data
+            }
+        );
     case RouteControllingExceptionType.ConcurrencyConflict:
-        return Conflict(routeControllingException);
+        return Conflict
+        (
+            new
+            {
+                Type = Enum.GetName(routeControllingException.Type), routeControllingException.Message,
+                routeControllingException.Data
+            }
+        );
     default:
         return Problem
         (

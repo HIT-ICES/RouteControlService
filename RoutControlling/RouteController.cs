@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Text.Json;
 using k8s;
 using k8s.Autorest;
 using k8s.Models;
@@ -35,7 +36,8 @@ public class RouteController(Kubernetes kubernetes, ILogger<RouteController> log
                         @namespace,
                         DestinationRule.PLURAL,
                         resName
-                    ) is not DestinationRule destinationRuleGot
+                    ) is not JsonElement destinationRuleGotJson
+                 || destinationRuleGotJson.Deserialize<DestinationRule>() is not { } destinationRuleGot
                  || destinationRuleGot.Spec.Subsets is null
                  || destinationRuleGot.Spec.Host != serviceName
                  || await kubernetes.GetNamespacedCustomObjectAsync
@@ -45,7 +47,8 @@ public class RouteController(Kubernetes kubernetes, ILogger<RouteController> log
                         @namespace,
                         VirtualService.PLURAL,
                         resName
-                    ) is not VirtualService virtualServiceGot
+                    ) is not JsonElement virtualServiceGotJson
+                 || virtualServiceGotJson.Deserialize<VirtualService>() is not { } virtualServiceGot
                  || virtualServiceGot.Spec.Http is null
                  || virtualServiceGot.Spec.Hosts?.Contains(serviceName) is not true)
                 {
@@ -179,7 +182,7 @@ public class RouteController(Kubernetes kubernetes, ILogger<RouteController> log
         var (@namespace, serviceName) = serviceRef;
         var resName = ResName(serviceName);
 
-        await CheckRules(newRules);
+        newRules = await CheckRules(newRules);
         try
         {
             AcquireLock(serviceRef);
@@ -206,20 +209,20 @@ public class RouteController(Kubernetes kubernetes, ILogger<RouteController> log
             {
                 throw new RouteControllingException("Failed to delete resources", ex);
             }
+
             await CreateAllInternal(newRules, serviceName, @namespace);
         }
         finally
         {
             ReleaseLock(serviceRef);
         }
-
     }
 
     /// <inheritdoc />
     public async Task CreateAllAsync(KubernetesResourceId serviceRef, RouteRule[] newRules)
     {
         var (@namespace, serviceName) = serviceRef;
-        await CheckRules(newRules);
+        newRules = await CheckRules(newRules);
         try
         {
             AcquireLock(serviceRef);
@@ -229,7 +232,6 @@ public class RouteController(Kubernetes kubernetes, ILogger<RouteController> log
         {
             ReleaseLock(serviceRef);
         }
-
     }
 
     private async Task CreateAllInternal(RouteRule[] newRules, string serviceName, string @namespace)
@@ -402,14 +404,25 @@ public class RouteController(Kubernetes kubernetes, ILogger<RouteController> log
         }
     }
 
-    private async Task CheckRules(RouteRule[] newRules, HashSet<KubernetesResourceId>? availablePods = null)
+    private KubernetesResourceId[] MatchPods
+        (IEnumerable<KubernetesResourceId> pods, HashSet<KubernetesResourceId>? availablePods = null)
     {
-        if (newRules.Length == 0) return;
-        await CheckServices(new(newRules[0].Namespace, newRules[0].DesService));
-        availablePods ??= await GetAvailablePods(true);
-        foreach (var pod in newRules.SelectMany(r => r.SrcPods.Concat(r.DesPods)))
+        List<KubernetesResourceId> matchedPods = [];
+        foreach (var pod in pods)
         {
-            if (availablePods.Contains(pod)) continue;
+            if (availablePods.Contains(pod))
+            {
+                matchedPods.Add(pod);
+                continue;
+            }
+
+            if (pod.Name.EndsWith("**"))
+            {
+                var match = pod.Name.Replace("**", "");
+                matchedPods.AddRange(availablePods.Where(p => p.Name.StartsWith(match)));
+                continue;
+            }
+
             logger.LogError
             (
                 "Pod referred in rules not available for route controlling: {pod}@{podns}.",
@@ -422,6 +435,25 @@ public class RouteController(Kubernetes kubernetes, ILogger<RouteController> log
                 RouteControllingExceptionType.UnmanagedPods
             );
         }
+
+        return matchedPods.Distinct().ToArray();
+    }
+
+    private async Task<RouteRule[]> CheckRules
+        (RouteRule[] newRules, HashSet<KubernetesResourceId>? availablePods = null)
+    {
+        if (newRules.Length == 0) return [];
+        await CheckServices(new(newRules[0].Namespace, newRules[0].DesService));
+        availablePods ??= await GetAvailablePods(true);
+        return newRules.Select
+                        (
+                            r => r with
+                                 {
+                                     SrcPods = MatchPods(r.SrcPods, availablePods),
+                                     DesPods = MatchPods(r.DesPods, availablePods)
+                                 }
+                        )
+                       .ToArray();
     }
 
     private (DestinationRule destRule, VirtualService vService) RulesToResources
@@ -517,7 +549,7 @@ public class RouteController(Kubernetes kubernetes, ILogger<RouteController> log
                                                         (
                                                             src => new HTTPMatchRequest
                                                                    {
-                                                                        SourceLabels =
+                                                                       SourceLabels =
                                                                            new Dictionary<string, string>
                                                                            {
                                                                                { kLabelName, src.Name },
