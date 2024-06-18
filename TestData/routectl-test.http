@@ -43,3 +43,40 @@ Content-Type: application/json
   "desService": "mpp",
   "name": ""
 }
+
+### Create Rules: 所有结点入都会从    {"namespace": "mpp-1-8588786769-jwnhp", "name": "routectl-test"} 返回
+
+POST http://localhost:8088/route-rules/add?allowOverwrite=true
+accept: application/json
+Content-Type: application/json
+
+{
+  "namespace": "shihaomai",
+  "desService": "service8",
+  "name": "shm-service8-control",
+  "srcPods": [
+    {
+      "namespace": "shihaomai",
+      "name": "service5-6c7dbb5b55-8c8r8"
+    },
+    {
+      "namespace": "shihaomai",
+      "name": "service5-6c7dbb5b55-8h2vx"
+    }
+  ],
+  "desPods": [
+    {
+      "namespace": "shihaomai",
+      "name": "service-8-deployment-a-6bfdfb948b-ptn9s"
+    }
+  ],
+  "endpointControls": [
+    {
+      "uri": "/test",
+      "useRegex": null
+    }
+  ],
+  "extraInfo": {
+    "portNumber": 8080
+  }
+}

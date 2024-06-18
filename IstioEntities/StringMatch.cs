@@ -30,7 +30,7 @@ public class StringMatch : Dictionary<string, string>
         get => this.FirstOrDefault().Value;
         set
         {
-            var val = this.FirstOrDefault().Key;
+            var val = this.FirstOrDefault().Key ?? "prefix";;
             Clear();
             Add(val, value);
         }
